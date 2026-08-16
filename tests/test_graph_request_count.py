@@ -3,7 +3,6 @@ from unittest.mock import MagicMock, patch
 import openai
 from sunbridge.config import settings
 from sunbridge.graph import build_compliance_pipeline, PipelineState
-from sunbridge.schemas.compliance import CandidateFieldWithSource, UnifiedExtractedCandidates
 from sunbridge.extraction import reset_llm_requests_counter
 
 def test_full_graph_successful_llm_request_count():
@@ -26,37 +25,24 @@ def test_full_graph_successful_llm_request_count():
         "errors": []
     }
 
-    mock_parsed = UnifiedExtractedCandidates(
-        candidates=[
-            CandidateFieldWithSource(
-                source_id="source_1",
-                field_name="model_name",
-                normalized_value="SUN-5K-G06P3-EU-AM2-P1"
-            ),
-            CandidateFieldWithSource(
-                source_id="source_1",
-                field_name="weight",
-                normalized_value="11",
-                raw_value="11 kg"
-            ),
-            CandidateFieldWithSource(
-                source_id="source_3",
-                field_name="weight",
-                normalized_value="18",
-                raw_value="18 kg"
-            )
-        ]
-    )
+    json_raw = '''{
+      "candidates": [
+        {"source_id": "source_1", "field_name": "model_name", "normalized_value": "SUN-5K-G06P3-EU-AM2-P1"},
+        {"source_id": "source_1", "field_name": "weight", "normalized_value": "11", "raw_value": "11 kg"},
+        {"source_id": "source_3", "field_name": "weight", "normalized_value": "18", "raw_value": "18 kg"}
+      ]
+    }'''
 
     mock_choice = MagicMock()
-    mock_choice.message.parsed = mock_parsed
+    mock_choice.finish_reason = "stop"
+    mock_choice.message.content = json_raw
     mock_response = MagicMock()
     mock_response.choices = [mock_choice]
 
     with patch("sunbridge.extraction.extractor.OpenAI") as mock_openai_cls:
         mock_client = MagicMock()
         mock_openai_cls.return_value = mock_client
-        mock_client.beta.chat.completions.parse.return_value = mock_response
+        mock_client.chat.completions.create.return_value = mock_response
 
         with patch.object(settings, "llm_api_key", "sk-test-key"):
             final_state = pipeline.invoke(initial_state)
@@ -64,7 +50,7 @@ def test_full_graph_successful_llm_request_count():
     # Hard Assertion: Exactly 1 LLM HTTP call across the entire pipeline
     assert final_state["llm_requests_made"] == 1
     assert final_state["extraction_mode"] == "LLM"
-    assert mock_client.beta.chat.completions.parse.call_count == 1
+    assert mock_client.chat.completions.create.call_count == 1
     assert final_state["is_valid"] is True
 
 def test_full_graph_429_rate_limit_request_count():
@@ -96,7 +82,7 @@ def test_full_graph_429_rate_limit_request_count():
     with patch("sunbridge.extraction.extractor.OpenAI") as mock_openai_cls:
         mock_client = MagicMock()
         mock_openai_cls.return_value = mock_client
-        mock_client.beta.chat.completions.parse.side_effect = rate_limit_err
+        mock_client.chat.completions.create.side_effect = rate_limit_err
 
         with patch.object(settings, "llm_api_key", "sk-test-key"):
             final_state = pipeline.invoke(initial_state)
@@ -105,5 +91,5 @@ def test_full_graph_429_rate_limit_request_count():
     assert final_state["llm_requests_made"] == 1
     assert final_state["extraction_mode"] == "RULE_BASED"
     assert final_state["llm_error"] == "RATE_LIMITED"
-    assert mock_client.beta.chat.completions.parse.call_count == 1
+    assert mock_client.chat.completions.create.call_count == 1
     assert final_state["is_valid"] is True

@@ -28,3 +28,7 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 pythonpath = ["src"]
+markers = [
+    "integration: marks tests that execute live network / LLM calls"
+]
+addopts = "-m 'not integration'"

@@ -13,7 +13,7 @@ def test_openai_client_max_retries_zero():
     with patch("sunbridge.extraction.extractor.OpenAI") as mock_openai_cls:
         mock_client = MagicMock()
         mock_openai_cls.return_value = mock_client
-        mock_client.beta.chat.completions.parse.side_effect = Exception("Stop execution")
+        mock_client.chat.completions.create.side_effect = Exception("Stop execution")
 
         with patch.object(settings, "llm_api_key", "sk-test-key"):
             extract_all_evidence_unified(docs)
@@ -35,11 +35,11 @@ def test_429_does_not_trigger_sdk_retries():
     with patch("sunbridge.extraction.extractor.OpenAI") as mock_openai_cls:
         mock_client = MagicMock()
         mock_openai_cls.return_value = mock_client
-        mock_client.beta.chat.completions.parse.side_effect = rate_limit_err
+        mock_client.chat.completions.create.side_effect = rate_limit_err
 
         with patch.object(settings, "llm_api_key", "sk-test-key"):
             records, mode, llm_err, reqs = extract_all_evidence_unified(docs)
 
-    assert mock_client.beta.chat.completions.parse.call_count == 1
+    assert mock_client.chat.completions.create.call_count == 1
     assert mode == "RULE_BASED"
     assert llm_err == "RATE_LIMITED"

@@ -1,19 +1,10 @@
 import pytest
 import json
-from sunbridge.ingestion.sources import get_all_sources
-from sunbridge.parsing import parse_source
-from sunbridge.extraction import extract_evidence_from_document
 from sunbridge.validation import reconcile_evidence, validate_compliance_record, serialize_compliance_json
 from sunbridge.reporting import render_sunbridge_draft
-from sunbridge.config import DOCS_FALLBACK_DIR
 
-def test_full_pipeline_output_validation():
-    sources = get_all_sources("http://example.com/dummy.pdf")
-    fallback_pdf = DOCS_FALLBACK_DIR / "src1_task2.pdf"
-    
-    docs = [parse_source(s, fallback_pdf) for s in sources]
-    all_evidence = [r for d in docs for r in extract_evidence_from_document(d)]
-    comp_rec = reconcile_evidence(all_evidence)
+def test_full_pipeline_output_validation(sample_evidence_records):
+    comp_rec = reconcile_evidence(sample_evidence_records)
     
     # 1. Validate compliance record & semantic guardrails
     assert validate_compliance_record(comp_rec) is True
