@@ -1,0 +1,382 @@
+{
+  "product_identity": {
+    "target_model_variant": "SUN-5K-G06P3-EU-AM2-P1",
+    "datasheet_model": "SUN-5K-G06P3-EU-AM2-P1",
+    "buyer_requested_model": "SUN-5K-G06P3-EU-AM2-P1",
+    "call_notes_model": "SUN-5K-G06P3",
+    "model_status": "VERIFIED for Datasheet/Buyer Form; Call notes omit variant suffix (-EU-AM2-P1)",
+    "variant_confirmation_status": "PENDING_FROM_MANUFACTURER",
+    "application": "Rooftop Solar Inverter",
+    "order_reference": "INT-2024-8841",
+    "import_destination": "Bangladesh"
+  },
+  "manufacturer_identity": {
+    "legal_name": "Ningbo Deye Inverter Technology Co., Ltd.",
+    "manufacturer_location": "China (Verified based on manufacturer address in datasheet)",
+    "country_of_origin_status": "Stated as China in buyer form and call notes; formal customs origin documentation was not supplied.",
+    "datasheet_source": "source_1",
+    "buyer_form_source": "source_2"
+  },
+  "electrical_specifications": {
+    "rated_ac_output_power": "5 kW (5000 W)",
+    "power_status": "Supported by manufacturer datasheet and consistent with buyer form (5000 W) and call notes (5 kW)",
+    "ingress_protection": "IP65 (Explicitly stated in manufacturer datasheet; call notes also verbally report IP65)",
+    "max_efficiency": "97.5% (Listed in manufacturer datasheet)",
+    "call_notes_efficiency": "high 90s efficiency (Unquantified verbal claim; not treated as independent documentary evidence)",
+    "weight_datasheet": "11 kg (Datasheet specification)",
+    "weight_call_notes": "approximately 18 kg (Installer phone estimate)",
+    "weight_status": "CONFLICT (Pending manufacturer confirmation)"
+  },
+  "testing_and_standards": {
+    "datasheet_cited_standards": "IEC/EN 62109-1/-2, IEC/EN 61000-6-1/-2/-3/-4 (Cited in datasheet; test reports/certificates not supplied)",
+    "sgs_status": "PENDING_FROM_MANUFACTURER (SGS was mentioned verbally in call notes, but no certificate or report was provided)",
+    "attached_documentation_status": "No test reports or certificates attached to intake materials"
+  },
+  "labeling": {
+    "label_information_supported_by_source_data": [
+      "Manufacturer Legal Name: Ningbo Deye Inverter Technology Co., Ltd.",
+      "Target Model Variant: SUN-5K-G06P3-EU-AM2-P1",
+      "Rated AC Output Power: 5 kW (5000 W)",
+      "Ingress Protection: IP65",
+      "Manufacturer Location: China"
+    ],
+    "physical_label_verification": {
+      "status": "PENDING_FROM_MANUFACTURER",
+      "reason": "No physical product label / rating-plate photograph was provided, so the actual production label has not been verified."
+    }
+  },
+  "importer_paperwork": {
+    "buyer": "SunBridge Trading Pvt. Ltd.",
+    "import_destination": "Bangladesh",
+    "order_reference": "INT-2024-8841",
+    "required_delivery_date": "2024-11-30",
+    "attached_documents": "None"
+  },
+  "pending_items": [
+    "Confirmation of exact product net weight (reconciling datasheet spec of 11 kg vs ~18 kg installer estimate).",
+    "Confirmation that the exact production variant for the Bangladesh order is SUN-5K-G06P3-EU-AM2-P1 (reconciling shortened call note reference 'SUN-5K-G06P3').",
+    "Applicable factory test reports and compliance / conformity certificates for this exact model.",
+    "SGS test report or certificate (verbal mention in call notes; no document attached).",
+    "High-resolution photograph of the actual production rating plate / product label."
+  ],
+  "conflicts": [
+    {
+      "field_name": "weight",
+      "conflicting_evidence": [
+        {
+          "field_name": "weight",
+          "normalized_value": "11",
+          "raw_value": "11 kg",
+          "unit": "kg",
+          "source_id": "source_1",
+          "source_type": "manufacturer_datasheet",
+          "location": "Datasheet Specification Table",
+          "confidence": 0.9,
+          "status": "CONFLICT",
+          "notes": "Net weight for 5kW model series from datasheet table"
+        },
+        {
+          "field_name": "weight",
+          "normalized_value": "18",
+          "raw_value": "maybe 18 kg? Installer guessed",
+          "unit": "kg",
+          "source_id": "source_3",
+          "source_type": "call_notes",
+          "location": "Call Notes Line 4",
+          "confidence": 0.4,
+          "status": "CONFLICT",
+          "notes": "Uncertain verbal installer guess"
+        }
+      ],
+      "resolution": "PENDING_FROM_MANUFACTURER",
+      "notes": "Datasheet specifies 11 kg net weight, whereas call notes record an installer estimate of approximately 18 kg."
+    }
+  ],
+  "questions_for_manufacturer": [
+    "Please confirm the final net weight of the production unit (reconciling datasheet spec of 11 kg vs ~18 kg installer estimate).",
+    "Please confirm that the exact production model/variant for the Bangladesh order is SUN-5K-G06P3-EU-AM2-P1.",
+    "Please provide the applicable test reports and compliance / conformity certificates for this exact model.",
+    "SGS was mentioned verbally in the call notes. Please provide the relevant SGS report/certificate if applicable.",
+    "Please provide a photograph of the actual production rating plate / product label.",
+    "Please provide the final production datasheet / specification for the exact ordered variant if the supplied document is not the final revision."
+  ],
+  "warnings": [],
+  "all_evidence": [
+    {
+      "field_name": "manufacturer_name",
+      "normalized_value": "Ningbo Deye Inverter Technology Co., Ltd.",
+      "raw_value": "Ningbo Deye Inverter Technology Co., Ltd.",
+      "unit": null,
+      "source_id": "source_1",
+      "source_type": "manufacturer_datasheet",
+      "location": "Datasheet Page 1 Header/Footer",
+      "confidence": 0.99,
+      "status": "VERIFIED",
+      "notes": "Extracted from manufacturer datasheet"
+    },
+    {
+      "field_name": "country_of_origin",
+      "normalized_value": "China",
+      "raw_value": "China",
+      "unit": null,
+      "source_id": "source_1",
+      "source_type": "manufacturer_datasheet",
+      "location": "Datasheet Manufacturer Details",
+      "confidence": 0.95,
+      "status": "VERIFIED",
+      "notes": "Manufacturer location"
+    },
+    {
+      "field_name": "model_name",
+      "normalized_value": "SUN-5K-G06P3-EU-AM2-P1",
+      "raw_value": "SUN-5K-G06P3-EU-AM2-P1",
+      "unit": null,
+      "source_id": "source_1",
+      "source_type": "manufacturer_datasheet",
+      "location": "Datasheet Specification Table",
+      "confidence": 0.99,
+      "status": "VERIFIED",
+      "notes": "Exact model specified in datasheet range"
+    },
+    {
+      "field_name": "rated_output_power",
+      "normalized_value": "5000",
+      "raw_value": "5 kW / 5000 W",
+      "unit": "W",
+      "source_id": "source_1",
+      "source_type": "manufacturer_datasheet",
+      "location": "Datasheet AC Output Data Table",
+      "confidence": 0.98,
+      "status": "VERIFIED",
+      "notes": "Rated AC Output Power for SUN-5K variant"
+    },
+    {
+      "field_name": "ip_rating",
+      "normalized_value": "IP65",
+      "raw_value": "IP65",
+      "unit": null,
+      "source_id": "source_1",
+      "source_type": "manufacturer_datasheet",
+      "location": "Datasheet General Data Table",
+      "confidence": 0.99,
+      "status": "VERIFIED",
+      "notes": "Ingress protection rating"
+    },
+    {
+      "field_name": "weight",
+      "normalized_value": "11",
+      "raw_value": "11 kg",
+      "unit": "kg",
+      "source_id": "source_1",
+      "source_type": "manufacturer_datasheet",
+      "location": "Datasheet Specification Table",
+      "confidence": 0.9,
+      "status": "CONFLICT",
+      "notes": "Net weight for 5kW model series from datasheet table"
+    },
+    {
+      "field_name": "max_efficiency",
+      "normalized_value": "97.5%",
+      "raw_value": "97.5%",
+      "unit": "%",
+      "source_id": "source_1",
+      "source_type": "manufacturer_datasheet",
+      "location": "Datasheet Efficiency Table",
+      "confidence": 0.95,
+      "status": "VERIFIED",
+      "notes": "Max efficiency listed in datasheet"
+    },
+    {
+      "field_name": "safety_standards",
+      "normalized_value": "IEC/EN 62109-1/-2, IEC/EN 61000-6-1/-2/-3/-4",
+      "raw_value": "IEC/EN 62109-1/-2, IEC/EN 61000-6-1/-2/-3/-4",
+      "unit": null,
+      "source_id": "source_1",
+      "source_type": "manufacturer_datasheet",
+      "location": "Datasheet Certifications Table",
+      "confidence": 0.95,
+      "status": "VERIFIED",
+      "notes": "Standards explicitly cited in datasheet table"
+    },
+    {
+      "field_name": "buyer_name",
+      "normalized_value": "SunBridge Trading Pvt. Ltd.",
+      "raw_value": "SunBridge Trading Pvt. Ltd.",
+      "unit": null,
+      "source_id": "source_2",
+      "source_type": "buyer_form",
+      "location": "Buyer Form Header",
+      "confidence": 1.0,
+      "status": "SOURCE_REPORTED",
+      "notes": null
+    },
+    {
+      "field_name": "destination_country",
+      "normalized_value": "Bangladesh",
+      "raw_value": "Bangladesh",
+      "unit": null,
+      "source_id": "source_2",
+      "source_type": "buyer_form",
+      "location": "Buyer Form Destination Field",
+      "confidence": 1.0,
+      "status": "SOURCE_REPORTED",
+      "notes": null
+    },
+    {
+      "field_name": "model_name",
+      "normalized_value": "SUN-5K-G06P3-EU-AM2-P1",
+      "raw_value": "SUN-5K-G06P3-EU-AM2-P1",
+      "unit": null,
+      "source_id": "source_2",
+      "source_type": "buyer_form",
+      "location": "Buyer Form Item Field",
+      "confidence": 1.0,
+      "status": "SOURCE_REPORTED",
+      "notes": null
+    },
+    {
+      "field_name": "buyer_stated_power",
+      "normalized_value": "5000",
+      "raw_value": "5000 W",
+      "unit": "W",
+      "source_id": "source_2",
+      "source_type": "buyer_form",
+      "location": "Buyer Form Item Description",
+      "confidence": 1.0,
+      "status": "SOURCE_REPORTED",
+      "notes": null
+    },
+    {
+      "field_name": "application_type",
+      "normalized_value": "Rooftop",
+      "raw_value": "rooftop",
+      "unit": null,
+      "source_id": "source_2",
+      "source_type": "buyer_form",
+      "location": "Buyer Form Item Description",
+      "confidence": 1.0,
+      "status": "SOURCE_REPORTED",
+      "notes": null
+    },
+    {
+      "field_name": "manufacturer_name",
+      "normalized_value": "Ningbo Deye Inverter Technology Co., Ltd.",
+      "raw_value": "Ningbo Deye Inverter Technology Co., Ltd., China",
+      "unit": null,
+      "source_id": "source_2",
+      "source_type": "buyer_form",
+      "location": "Buyer Form Maker Field",
+      "confidence": 1.0,
+      "status": "SOURCE_REPORTED",
+      "notes": null
+    },
+    {
+      "field_name": "order_ref",
+      "normalized_value": "INT-2024-8841",
+      "raw_value": "Ref: INT-2024-8841",
+      "unit": null,
+      "source_id": "source_2",
+      "source_type": "buyer_form",
+      "location": "Buyer Form Header",
+      "confidence": 1.0,
+      "status": "SOURCE_REPORTED",
+      "notes": null
+    },
+    {
+      "field_name": "attached_docs",
+      "normalized_value": "none",
+      "raw_value": "none",
+      "unit": null,
+      "source_id": "source_2",
+      "source_type": "buyer_form",
+      "location": "Buyer Form Attached Docs Field",
+      "confidence": 1.0,
+      "status": "SOURCE_REPORTED",
+      "notes": null
+    },
+    {
+      "field_name": "model_name",
+      "normalized_value": "SUN-5K-G06P3",
+      "raw_value": "SUN-5K-G06P3",
+      "unit": null,
+      "source_id": "source_3",
+      "source_type": "call_notes",
+      "location": "Call Notes Line 2",
+      "confidence": 0.8,
+      "status": "SOURCE_REPORTED",
+      "notes": "Verbal model claim"
+    },
+    {
+      "field_name": "verbal_power",
+      "normalized_value": "5000",
+      "raw_value": "5 kW",
+      "unit": "W",
+      "source_id": "source_3",
+      "source_type": "call_notes",
+      "location": "Call Notes Line 2",
+      "confidence": 0.8,
+      "status": "SOURCE_REPORTED",
+      "notes": "Verbal 5 kW claim"
+    },
+    {
+      "field_name": "ip_rating",
+      "normalized_value": "IP65",
+      "raw_value": "Said IP65",
+      "unit": null,
+      "source_id": "source_3",
+      "source_type": "call_notes",
+      "location": "Call Notes Line 3",
+      "confidence": 0.7,
+      "status": "SOURCE_REPORTED",
+      "notes": "Verbal IP65 claim"
+    },
+    {
+      "field_name": "weight",
+      "normalized_value": "18",
+      "raw_value": "maybe 18 kg? Installer guessed",
+      "unit": "kg",
+      "source_id": "source_3",
+      "source_type": "call_notes",
+      "location": "Call Notes Line 4",
+      "confidence": 0.4,
+      "status": "CONFLICT",
+      "notes": "Uncertain verbal installer guess"
+    },
+    {
+      "field_name": "sgs_testing_claim",
+      "normalized_value": "Mentioned SGS on phone - nothing in writing",
+      "raw_value": "Mentioned SGS on the phone — nothing in writing",
+      "unit": null,
+      "source_id": "source_3",
+      "source_type": "call_notes",
+      "location": "Call Notes Line 5",
+      "confidence": 0.3,
+      "status": "SOURCE_REPORTED",
+      "notes": "Verbal mention only; no document attached"
+    },
+    {
+      "field_name": "efficiency_claim",
+      "normalized_value": "high 90s efficiency",
+      "raw_value": "high 90s efficiency",
+      "unit": null,
+      "source_id": "source_3",
+      "source_type": "call_notes",
+      "location": "Call Notes Line 5",
+      "confidence": 0.5,
+      "status": "SOURCE_REPORTED",
+      "notes": "Vague verbal claim"
+    },
+    {
+      "field_name": "label_photo",
+      "normalized_value": "Missing",
+      "raw_value": "No label photo yet",
+      "unit": null,
+      "source_id": "source_3",
+      "source_type": "call_notes",
+      "location": "Call Notes Line 6",
+      "confidence": 1.0,
+      "status": "SOURCE_REPORTED",
+      "notes": "Explicitly recorded as missing"
+    }
+  ]
+}
