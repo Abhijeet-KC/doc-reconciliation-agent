@@ -1,2 +1,19 @@
-Docs
-venv
+# Environment & Secrets
+.env
+
+# Python & Virtual Envs
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Output & Cache Data
+output/
+data/cache/
+data/raw/
+.ipynb_checkpoints/
+Features/
