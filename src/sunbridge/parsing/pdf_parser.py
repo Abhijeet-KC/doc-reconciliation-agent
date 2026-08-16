@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
 from typing import Union
-import fitz  # PyMuPDF
+import pymupdf  # PyMuPDF
 from sunbridge.ingestion.sources import SourceDefinition, SourceType
 from sunbridge.parsing.models import DocumentData, PageData, TableData
 
@@ -15,7 +15,7 @@ def parse_pdf_document(pdf_path: Union[str, Path], source_def: SourceDefinition)
     if not pdf_path.exists():
         raise FileNotFoundError(f"PDF file not found at {pdf_path}")
 
-    doc = fitz.open(str(pdf_path))
+    doc = pymupdf.open(str(pdf_path))
     pages: list[PageData] = []
     full_text_parts: list[str] = []
 
