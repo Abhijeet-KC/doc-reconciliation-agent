@@ -42,6 +42,19 @@ class ExtractedCandidates(BaseModel):
     source_type: SourceType
     candidates: List[CandidateField] = Field(default_factory=list)
 
+class CandidateFieldWithSource(BaseModel):
+    source_id: str
+    field_name: str
+    normalized_value: Optional[str] = None
+    raw_value: Optional[str] = None
+    unit: Optional[str] = None
+    location: Optional[str] = None
+    confidence: float = 1.0
+    notes: Optional[str] = None
+
+class UnifiedExtractedCandidates(BaseModel):
+    candidates: List[CandidateFieldWithSource] = Field(default_factory=list)
+
 class ComplianceRecord(BaseModel):
     product_identity: Dict[str, Any] = Field(default_factory=dict)
     manufacturer_identity: Dict[str, Any] = Field(default_factory=dict)

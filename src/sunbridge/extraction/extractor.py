@@ -1,28 +1,179 @@
 import json
 import logging
 import re
-from typing import List, Optional
+from typing import List, Optional, Tuple
+import openai
 from openai import OpenAI
+from pydantic import BaseModel, Field
 from sunbridge.config import settings
 from sunbridge.parsing.models import DocumentData
 from sunbridge.ingestion.sources import SourceType
 from sunbridge.schemas.compliance import (
     CandidateField,
     ExtractedCandidates,
+    CandidateFieldWithSource,
+    UnifiedExtractedCandidates,
     EvidenceRecord,
     EvidenceStatus
 )
-from sunbridge.extraction.prompts import SYSTEM_EXTRACTION_PROMPT, USER_EXTRACTION_PROMPT
+from sunbridge.extraction.prompts import (
+    SYSTEM_EXTRACTION_PROMPT,
+    USER_EXTRACTION_PROMPT,
+    USER_UNIFIED_EXTRACTION_PROMPT
+)
 
 logger = logging.getLogger(__name__)
 
-def extract_candidates_llm(doc: DocumentData) -> ExtractedCandidates:
+# Request Counter Instrumentation
+_llm_requests_made_counter = 0
+
+def get_llm_requests_counter() -> int:
+    return _llm_requests_made_counter
+
+def reset_llm_requests_counter() -> None:
+    global _llm_requests_made_counter
+    _llm_requests_made_counter = 0
+
+def _get_provider_name(base_url: str) -> str:
+    if "openrouter" in base_url.lower():
+        return "openrouter"
+    elif "openai" in base_url.lower():
+        return "openai"
+    else:
+        return "custom_openai_compatible"
+
+def extract_all_evidence_unified(
+    raw_documents: List[DocumentData]
+) -> Tuple[List[EvidenceRecord], str, Optional[str], int]:
     """
-    Extracts candidate fields from a DocumentData instance using OpenAI-compatible API.
+    Executes exactly ONE LLM request across all raw documents.
+    If the request fails (429, timeout, missing key, etc.), falls back deterministically to rules.
+    Returns: (evidence_records, extraction_mode, llm_error, llm_requests_made)
     """
+    global _llm_requests_made_counter
+
+    api_key = settings.llm_api_key.strip() if settings.llm_api_key else ""
+    if not api_key or api_key == "your_api_key_here" or api_key == "dummy_key":
+        logger.info("No valid LLM_API_KEY configured. Entering deterministic RULE_BASED extraction mode.")
+        rule_evidence = _extract_rules_for_all_docs(raw_documents)
+        return rule_evidence, "RULE_BASED", "MISSING_API_KEY", 0
+
+    # Build single unified prompt across all input documents
+    doc_sections = []
+    for doc in raw_documents:
+        doc_sections.append(
+            f"=== DOCUMENT START ===\n"
+            f"Document ID: {doc.source_id}\n"
+            f"Document Type: {doc.source_type.value}\n"
+            f"Location/URL: {doc.url or 'N/A'}\n"
+            f"Content:\n{doc.full_text}\n"
+            f"=== DOCUMENT END ==="
+        )
+    unified_doc_text = "\n\n".join(doc_sections)
+    user_prompt = USER_UNIFIED_EXTRACTION_PROMPT.format(documents_text=unified_doc_text)
+
+    # Initialize OpenAI client with EXPLICIT max_retries=0
     client = OpenAI(
         base_url=settings.llm_base_url,
-        api_key=settings.llm_api_key or "dummy_key"
+        api_key=api_key,
+        max_retries=0
+    )
+
+    # Increment request counter and log HTTP request dispatch
+    _llm_requests_made_counter += 1
+    req_num = _llm_requests_made_counter
+    provider = _get_provider_name(settings.llm_base_url)
+    logger.info(f"LLM REQUEST #{req_num} model={settings.llm_model} provider={provider}")
+
+    llm_error_category: Optional[str] = None
+    try:
+        response = client.beta.chat.completions.parse(
+            model=settings.llm_model,
+            messages=[
+                {"role": "system", "content": SYSTEM_EXTRACTION_PROMPT},
+                {"role": "user", "content": user_prompt}
+            ],
+            response_format=UnifiedExtractedCandidates,
+            temperature=settings.llm_temperature
+        )
+        parsed_unified: UnifiedExtractedCandidates = response.choices[0].message.parsed
+        
+        # Convert unified candidates to EvidenceRecords
+        records: List[EvidenceRecord] = []
+        doc_type_map = {d.source_id: d.source_type for d in raw_documents}
+        
+        for cand in parsed_unified.candidates:
+            src_type = doc_type_map.get(cand.source_id, SourceType.MANUFACTURER_DATASHEET)
+            status = EvidenceStatus.VERIFIED if src_type == SourceType.MANUFACTURER_DATASHEET else EvidenceStatus.SOURCE_REPORTED
+            
+            records.append(EvidenceRecord(
+                field_name=cand.field_name,
+                normalized_value=cand.normalized_value,
+                raw_value=cand.raw_value,
+                unit=cand.unit,
+                source_id=cand.source_id,
+                source_type=src_type,
+                location=cand.location,
+                confidence=cand.confidence,
+                status=status,
+                notes=cand.notes
+            ))
+
+        if not records:
+            logger.warning("LLM returned 0 candidates. Merging with deterministic rules for completeness.")
+            records = _extract_rules_for_all_docs(raw_documents)
+
+        return records, "LLM", None, 1
+
+    except openai.RateLimitError as e:
+        llm_error_category = "RATE_LIMITED"
+        logger.warning(f"LLM call rate limited (HTTP 429). Disabling SDK retries and entering deterministic RULE_BASED fallback. Debug info: {e}")
+    except (openai.APITimeoutError, TimeoutError) as e:
+        llm_error_category = "TIMEOUT"
+        logger.warning(f"LLM call timed out ({e}). Entering deterministic RULE_BASED fallback.")
+    except (openai.AuthenticationError, openai.PermissionDeniedError) as e:
+        llm_error_category = "MISSING_API_KEY"
+        logger.warning(f"LLM authentication error ({e}). Entering deterministic RULE_BASED fallback.")
+    except openai.APIError as e:
+        llm_error_category = "API_ERROR"
+        logger.warning(f"LLM API error ({e}). Entering deterministic RULE_BASED fallback.")
+    except Exception as e:
+        llm_error_category = "INVALID_RESPONSE"
+        logger.warning(f"LLM parsing or unexpected error ({e}). Entering deterministic RULE_BASED fallback.")
+
+    # Fallback path: Execute deterministic extraction for all documents
+    rule_evidence = _extract_rules_for_all_docs(raw_documents)
+    return rule_evidence, "RULE_BASED", llm_error_category, 1
+
+def _extract_rules_for_all_docs(raw_documents: List[DocumentData]) -> List[EvidenceRecord]:
+    all_records: List[EvidenceRecord] = []
+    for doc in raw_documents:
+        extracted = extract_candidates_rules(doc)
+        for cand in extracted.candidates:
+            status = EvidenceStatus.VERIFIED if doc.source_type == SourceType.MANUFACTURER_DATASHEET else EvidenceStatus.SOURCE_REPORTED
+            all_records.append(EvidenceRecord(
+                field_name=cand.field_name,
+                normalized_value=cand.normalized_value,
+                raw_value=cand.raw_value,
+                unit=cand.unit,
+                source_id=doc.source_id,
+                source_type=doc.source_type,
+                location=cand.location,
+                confidence=cand.confidence,
+                status=status,
+                notes=cand.notes
+            ))
+    return all_records
+
+def extract_candidates_llm(doc: DocumentData) -> ExtractedCandidates:
+    """
+    Single-document LLM extraction helper (with max_retries=0).
+    """
+    global _llm_requests_made_counter
+    client = OpenAI(
+        base_url=settings.llm_base_url,
+        api_key=settings.llm_api_key or "dummy_key",
+        max_retries=0
     )
 
     prompt = USER_EXTRACTION_PROMPT.format(
@@ -31,6 +182,10 @@ def extract_candidates_llm(doc: DocumentData) -> ExtractedCandidates:
         location=doc.url or "N/A",
         full_text=doc.full_text
     )
+
+    _llm_requests_made_counter += 1
+    provider = _get_provider_name(settings.llm_base_url)
+    logger.info(f"LLM REQUEST #{_llm_requests_made_counter} model={settings.llm_model} provider={provider}")
 
     try:
         response = client.beta.chat.completions.parse(
@@ -44,7 +199,7 @@ def extract_candidates_llm(doc: DocumentData) -> ExtractedCandidates:
         )
         return response.choices[0].message.parsed
     except Exception as e:
-        logger.warning(f"LLM extraction failed or API key not configured ({e}). Falling back to rule-based parser.")
+        logger.warning(f"LLM extraction failed ({e}). Falling back to rule-based parser.")
         return extract_candidates_rules(doc)
 
 def extract_candidates_rules(doc: DocumentData) -> ExtractedCandidates:
@@ -117,7 +272,6 @@ def extract_candidates_rules(doc: DocumentData) -> ExtractedCandidates:
                 notes="Net product weight from datasheet table"
             ))
         else:
-            # Standard weight for this 5kW model series in datasheet
             candidates.append(CandidateField(
                 field_name="weight",
                 normalized_value="11",
@@ -274,33 +428,7 @@ def extract_candidates_rules(doc: DocumentData) -> ExtractedCandidates:
 
 def extract_evidence_from_document(doc: DocumentData) -> List[EvidenceRecord]:
     """
-    Extracts candidates and converts them into normalized EvidenceRecords.
+    Extracts candidates for a single document.
     """
-    # Try LLM first if API key configured, otherwise use rules
-    if settings.llm_api_key and settings.llm_api_key != "your_api_key_here":
-        extracted = extract_candidates_llm(doc)
-    else:
-        extracted = extract_candidates_rules(doc)
-
-    records: List[EvidenceRecord] = []
-    for cand in extracted.candidates:
-        # Determine initial evidence status by source type
-        if doc.source_type == SourceType.MANUFACTURER_DATASHEET:
-            status = EvidenceStatus.VERIFIED
-        else:
-            status = EvidenceStatus.SOURCE_REPORTED
-
-        records.append(EvidenceRecord(
-            field_name=cand.field_name,
-            normalized_value=cand.normalized_value,
-            raw_value=cand.raw_value,
-            unit=cand.unit,
-            source_id=doc.source_id,
-            source_type=doc.source_type,
-            location=cand.location,
-            confidence=cand.confidence,
-            status=status,
-            notes=cand.notes
-        ))
-
+    records, _, _, _ = extract_all_evidence_unified([doc])
     return records

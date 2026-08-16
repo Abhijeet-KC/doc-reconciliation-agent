@@ -11,5 +11,9 @@ class PipelineState(TypedDict):
     compliance_record: Optional[ComplianceRecord]
     json_output_path: Optional[str]
     draft_output_path: Optional[str]
+    extraction_mode: str          # "LLM" or "RULE_BASED"
+    llm_error: Optional[str]        # None or error category string like "RATE_LIMITED"
+    llm_requests_made: int
+    timings: Dict[str, float]
     is_valid: bool
     errors: List[str]

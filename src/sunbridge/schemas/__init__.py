@@ -8,6 +8,8 @@ from .compliance import (
     ConflictRecord,
     CandidateField,
     ExtractedCandidates,
+    CandidateFieldWithSource,
+    UnifiedExtractedCandidates,
     ComplianceRecord
 )
 
@@ -17,5 +19,7 @@ __all__ = [
     "ConflictRecord",
     "CandidateField",
     "ExtractedCandidates",
+    "CandidateFieldWithSource",
+    "UnifiedExtractedCandidates",
     "ComplianceRecord"
 ]

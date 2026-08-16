@@ -1,10 +1,11 @@
 import logging
+import time
 from pathlib import Path
 from langgraph.graph import StateGraph, START, END
 from sunbridge.config import settings, OUTPUT_DIR
 from sunbridge.ingestion import get_all_sources, fetch_datasheet
 from sunbridge.parsing import parse_source
-from sunbridge.extraction import extract_evidence_from_document
+from sunbridge.extraction import extract_all_evidence_unified
 from sunbridge.validation import reconcile_evidence, serialize_compliance_json, validate_compliance_record
 from sunbridge.reporting import generate_draft_file
 from sunbridge.graph.state import PipelineState
@@ -13,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 def fetch_sources_node(state: PipelineState) -> PipelineState:
     logger.info("Node [FETCH_SOURCES]: Fetching source definitions and downloading datasheet...")
+    t0 = time.time()
     sources = get_all_sources(settings.source1_url)
     try:
         pdf_path = fetch_datasheet(settings.source1_url)
@@ -22,14 +24,20 @@ def fetch_sources_node(state: PipelineState) -> PipelineState:
         state["errors"].append(str(e))
         local_pdf_str = None
 
+    elapsed = time.time() - t0
+    timings = dict(state.get("timings", {}))
+    timings["Download"] = elapsed
+
     return {
         **state,
         "sources": sources,
-        "local_pdf_path": local_pdf_str
+        "local_pdf_path": local_pdf_str,
+        "timings": timings
     }
 
 def parse_documents_node(state: PipelineState) -> PipelineState:
     logger.info("Node [PARSE_DOCUMENTS]: Parsing documents with PyMuPDF fitz...")
+    t0 = time.time()
     parsed_docs = []
     pdf_path = state.get("local_pdf_path")
 
@@ -41,28 +49,41 @@ def parse_documents_node(state: PipelineState) -> PipelineState:
             logger.error(f"Failed to parse source {src.id}: {e}")
             state["errors"].append(f"Parse error {src.id}: {e}")
 
+    elapsed = time.time() - t0
+    timings = dict(state.get("timings", {}))
+    timings["Parsing"] = elapsed
+
     return {
         **state,
-        "raw_documents": parsed_docs
+        "raw_documents": parsed_docs,
+        "timings": timings
     }
 
 def extract_candidate_fields_node(state: PipelineState) -> PipelineState:
-    logger.info("Node [EXTRACT_CANDIDATE_FIELDS]: Extracting fields...")
-    all_ev = []
-    for doc in state["raw_documents"]:
-        ev_records = extract_evidence_from_document(doc)
-        all_ev.extend(ev_records)
+    logger.info("Node [EXTRACT_CANDIDATE_FIELDS]: Executing unified single LLM extraction...")
+    t0 = time.time()
+    raw_docs = state.get("raw_documents", [])
+    
+    # EXACTLY ONE LLM HTTP call site for the entire pipeline
+    records, mode, llm_err, reqs_made = extract_all_evidence_unified(raw_docs)
+    
+    elapsed = time.time() - t0
+    timings = dict(state.get("timings", {}))
+    timings["LLM"] = elapsed
 
     return {
         **state,
-        "extracted_evidence": all_ev
+        "extracted_evidence": records,
+        "extraction_mode": mode,
+        "llm_error": llm_err,
+        "llm_requests_made": reqs_made,
+        "timings": timings
     }
 
 def normalize_fields_node(state: PipelineState) -> PipelineState:
     logger.info("Node [NORMALIZE_FIELDS]: Normalizing extracted values...")
-    # Standardize values (units, text capitalization)
     normalized_ev = []
-    for ev in state["extracted_evidence"]:
+    for ev in state.get("extracted_evidence", []):
         if ev.unit and "kg" in ev.unit.lower():
             ev.unit = "kg"
         elif ev.unit and "w" in ev.unit.lower():
@@ -76,45 +97,62 @@ def normalize_fields_node(state: PipelineState) -> PipelineState:
 
 def validate_and_compare_sources_node(state: PipelineState) -> PipelineState:
     logger.info("Node [VALIDATE_AND_COMPARE_SOURCES]: Reconciling multi-source evidence...")
-    compliance_rec = reconcile_evidence(state["extracted_evidence"])
+    t0 = time.time()
+    compliance_rec = reconcile_evidence(state.get("extracted_evidence", []))
+    
+    elapsed = time.time() - t0
+    timings = dict(state.get("timings", {}))
+    timings["Validation"] = elapsed
+
     return {
         **state,
-        "compliance_record": compliance_rec
+        "compliance_record": compliance_rec,
+        "timings": timings
     }
 
 def classify_evidence_node(state: PipelineState) -> PipelineState:
     logger.info("Node [CLASSIFY_EVIDENCE]: Classifying evidence status and pending items...")
-    # Verified by compliance record build
     return state
 
 def generate_structured_output_node(state: PipelineState) -> PipelineState:
     logger.info("Node [GENERATE_STRUCTURED_OUTPUT]: Writing compliance.json...")
-    rec = state["compliance_record"]
+    t0 = time.time()
+    rec = state.get("compliance_record")
     json_path = OUTPUT_DIR / "compliance.json"
     if rec:
         json_str = serialize_compliance_json(rec)
         with open(json_path, "w", encoding="utf-8") as f:
             f.write(json_str)
+        
+        elapsed = time.time() - t0
+        timings = dict(state.get("timings", {}))
+        timings["Rendering"] = timings.get("Rendering", 0.0) + elapsed
         return {
             **state,
-            "json_output_path": str(json_path)
+            "json_output_path": str(json_path),
+            "timings": timings
         }
     return state
 
 def generate_human_draft_node(state: PipelineState) -> PipelineState:
     logger.info("Node [GENERATE_HUMAN_DRAFT]: Rendering sunbridge_draft.md...")
-    rec = state["compliance_record"]
+    t0 = time.time()
+    rec = state.get("compliance_record")
     if rec:
         draft_path = generate_draft_file(rec)
+        elapsed = time.time() - t0
+        timings = dict(state.get("timings", {}))
+        timings["Rendering"] = timings.get("Rendering", 0.0) + elapsed
         return {
             **state,
-            "draft_output_path": str(draft_path)
+            "draft_output_path": str(draft_path),
+            "timings": timings
         }
     return state
 
 def validate_output_node(state: PipelineState) -> PipelineState:
     logger.info("Node [VALIDATE_OUTPUT]: Verifying final pipeline output integrity...")
-    rec = state["compliance_record"]
+    rec = state.get("compliance_record")
     if rec:
         try:
             is_valid = validate_compliance_record(rec)
