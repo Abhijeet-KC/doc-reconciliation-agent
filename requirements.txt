@@ -1,0 +1,7 @@
+langgraph>=0.1.0        # Workflow & agent orchestration
+pydantic>=2.0.0         
+PyMuPDF>=1.23.0         
+httpx>=0.25.0           
+openai>=1.0.0           
+python-dotenv>=1.0.0    
+pytest>=8.0.0           
