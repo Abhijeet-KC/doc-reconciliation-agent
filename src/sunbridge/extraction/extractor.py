@@ -4,6 +4,7 @@ import re
 from typing import List, Optional, Tuple
 import openai
 from openai import OpenAI
+import pydantic
 from pydantic import BaseModel, Field
 from sunbridge.config import settings
 from sunbridge.parsing.models import DocumentData
@@ -42,12 +43,36 @@ def _get_provider_name(base_url: str) -> str:
     else:
         return "custom_openai_compatible"
 
+def sanitize_json_text(raw_text: str) -> str:
+    """
+    Deterministically sanitizes raw LLM output text:
+    1. Removes markdown code block fences (```json ... ```).
+    2. Isolates the outermost JSON object { ... } or array [ ... ].
+    3. Strips leading and trailing whitespace.
+    """
+    if not raw_text:
+        return ""
+    text = raw_text.strip()
+    
+    # 1. Remove markdown code block fences if present
+    fenced_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text, re.IGNORECASE)
+    if fenced_match:
+        text = fenced_match.group(1).strip()
+        
+    # 2. Isolate JSON object { ... } or array [ ... ]
+    start_brace = text.find("{")
+    end_brace = text.rfind("}")
+    if start_brace != -1 and end_brace != -1 and end_brace > start_brace:
+        text = text[start_brace : end_brace + 1].strip()
+        
+    return text
+
 def extract_all_evidence_unified(
     raw_documents: List[DocumentData]
 ) -> Tuple[List[EvidenceRecord], str, Optional[str], int]:
     """
-    Executes exactly ONE LLM request across all raw documents.
-    If the request fails (429, timeout, missing key, etc.), falls back deterministically to rules.
+    Executes exactly ONE LLM request across all raw documents with robust response parsing.
+    If the request fails (429, truncation, invalid JSON, timeout, missing key), falls back deterministically to rules.
     Returns: (evidence_records, extraction_mode, llm_error, llm_requests_made)
     """
     global _llm_requests_made_counter
@@ -87,21 +112,43 @@ def extract_all_evidence_unified(
 
     llm_error_category: Optional[str] = None
     try:
-        response = client.beta.chat.completions.parse(
+        response = client.chat.completions.create(
             model=settings.llm_model,
             messages=[
                 {"role": "system", "content": SYSTEM_EXTRACTION_PROMPT},
                 {"role": "user", "content": user_prompt}
             ],
-            response_format=UnifiedExtractedCandidates,
-            temperature=settings.llm_temperature
+            response_format={"type": "json_object"},
+            temperature=settings.llm_temperature,
+            max_tokens=2000
         )
-        parsed_unified: UnifiedExtractedCandidates = response.choices[0].message.parsed
-        
-        # Convert unified candidates to EvidenceRecords
+
+        choice = response.choices[0]
+        finish_reason = getattr(choice, "finish_reason", "stop")
+        raw_content = choice.message.content or ""
+
+        # Safe debug logging (length, finish_reason, snippets)
+        content_len = len(raw_content)
+        snippet_start = raw_content[:200].replace("\n", " ")
+        snippet_end = raw_content[-200:].replace("\n", " ") if content_len > 200 else snippet_start
+        logger.info(f"LLM Response received: len={content_len} finish_reason={finish_reason} snippet_start='{snippet_start}' snippet_end='{snippet_end}'")
+
+        # 1. Truncation Detection
+        if finish_reason in ("length", "max_tokens"):
+            logger.warning(f"LLM output truncated due to token limit (finish_reason={finish_reason}). Entering RULE_BASED fallback.")
+            llm_error_category = "TRUNCATED_RESPONSE"
+            rule_evidence = _extract_rules_for_all_docs(raw_documents)
+            return rule_evidence, "RULE_BASED", llm_error_category, 1
+
+        # 2. Robust Deterministic JSON Sanitization and Validation
+        clean_json_str = sanitize_json_text(raw_content)
+        json_data = json.loads(clean_json_str)
+        parsed_unified = UnifiedExtractedCandidates.model_validate(json_data)
+
+        # Convert candidates to EvidenceRecords
         records: List[EvidenceRecord] = []
         doc_type_map = {d.source_id: d.source_type for d in raw_documents}
-        
+
         for cand in parsed_unified.candidates:
             src_type = doc_type_map.get(cand.source_id, SourceType.MANUFACTURER_DATASHEET)
             status = EvidenceStatus.VERIFIED if src_type == SourceType.MANUFACTURER_DATASHEET else EvidenceStatus.SOURCE_REPORTED
@@ -120,7 +167,7 @@ def extract_all_evidence_unified(
             ))
 
         if not records:
-            logger.warning("LLM returned 0 candidates. Merging with deterministic rules for completeness.")
+            logger.warning("LLM returned 0 candidate fields. Merging with deterministic rules for completeness.")
             records = _extract_rules_for_all_docs(raw_documents)
 
         return records, "LLM", None, 1
@@ -134,12 +181,15 @@ def extract_all_evidence_unified(
     except (openai.AuthenticationError, openai.PermissionDeniedError) as e:
         llm_error_category = "MISSING_API_KEY"
         logger.warning(f"LLM authentication error ({e}). Entering deterministic RULE_BASED fallback.")
+    except (json.JSONDecodeError, pydantic.ValidationError) as e:
+        llm_error_category = "INVALID_RESPONSE"
+        logger.warning(f"LLM response failed JSON parsing or schema validation ({e}). Entering deterministic RULE_BASED fallback.")
     except openai.APIError as e:
         llm_error_category = "API_ERROR"
         logger.warning(f"LLM API error ({e}). Entering deterministic RULE_BASED fallback.")
     except Exception as e:
         llm_error_category = "INVALID_RESPONSE"
-        logger.warning(f"LLM parsing or unexpected error ({e}). Entering deterministic RULE_BASED fallback.")
+        logger.warning(f"Unexpected error during LLM extraction ({e}). Entering deterministic RULE_BASED fallback.")
 
     # Fallback path: Execute deterministic extraction for all documents
     rule_evidence = _extract_rules_for_all_docs(raw_documents)
@@ -188,16 +238,20 @@ def extract_candidates_llm(doc: DocumentData) -> ExtractedCandidates:
     logger.info(f"LLM REQUEST #{_llm_requests_made_counter} model={settings.llm_model} provider={provider}")
 
     try:
-        response = client.beta.chat.completions.parse(
+        response = client.chat.completions.create(
             model=settings.llm_model,
             messages=[
                 {"role": "system", "content": SYSTEM_EXTRACTION_PROMPT},
                 {"role": "user", "content": prompt}
             ],
-            response_format=ExtractedCandidates,
-            temperature=settings.llm_temperature
+            response_format={"type": "json_object"},
+            temperature=settings.llm_temperature,
+            max_tokens=2000
         )
-        return response.choices[0].message.parsed
+        raw_content = response.choices[0].message.content or ""
+        clean_json_str = sanitize_json_text(raw_content)
+        json_data = json.loads(clean_json_str)
+        return ExtractedCandidates.model_validate(json_data)
     except Exception as e:
         logger.warning(f"LLM extraction failed ({e}). Falling back to rule-based parser.")
         return extract_candidates_rules(doc)
