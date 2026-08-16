@@ -13,7 +13,7 @@ dist/
 build/
 
 # Output & Cache Data
-
+output-first/
 data/cache/
 data/raw/
 .ipynb_checkpoints/
